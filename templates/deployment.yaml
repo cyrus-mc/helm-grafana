@@ -1,0 +1,79 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    component: {{ template "fullname" . }}
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+  name: {{ template "fullname" . }}
+  namespace: {{ .Values.Namespace | default "default" }}
+spec:
+  replicas: {{ .Values.Replicas | default 1 }}
+  template:
+    metadata:
+      labels:
+        component: {{ template "fullname" . }}
+        chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+        heritage: {{ .Release.Service | quote }}
+        release: {{ .Release.Name | quote }}
+    spec:
+      containers:
+      - name: "grafana"
+        image: "{{ .Values.Image.Name }}:{{ .Values.Image.Tag }}"
+        imagePullPolicy: {{ .Values.Image.PullPolicy | default "Always" }}
+        env:
+        - name: "GF_SECURITY_ADMIN_USER"
+          valueFrom:
+            secretKeyRef:
+              name: {{ template "fullname" . }}
+              key: "grafana-admin-user"
+        - name: "GF_SECURITY_ADMIN_PASSWORD"
+          valueFrom:
+            secretKeyRef:
+              name: {{ template "fullname" . }}
+              key: "grafana-admin-password"
+        {{- if .Values.InstallPlugins }}
+        - name: "GF_INSTALL_PLUGINS"
+          valueFrom:
+            configMapKeyRef:
+              name: {{ template "fullname" . }}
+              key: "grafana-install-plugins"
+        {{- end }}
+        ports:
+        - containerPort: {{ .Values.Port.Container }}
+          name: "http"
+          protocol: "TCP"
+        readinessProbe:
+          httpGet:
+            path: "/login"
+            port: {{ .Values.Port.Container }}
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+        resources:
+{{ toYaml .Values.Resources | indent 12 }}
+        volumeMounts:
+        - name: "config-volume"
+          mountPath: "/etc/grafana"
+        - name: "storage-volume"
+          mountPath: "/var/lib/grafana/data"
+      {{- if .Values.Image.PullSecret }}
+      imagePullSecrets:
+      - name: {{ .Values.Image.PullSecret }}
+      {{- end }}
+      {{- if .Values.NodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.NodeSelector | indent 8 }}  
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.TerminationGracePeriodSeconds }}
+      volumes:
+      - name: "config-volume"
+        configMap:
+          name: {{ template "fullname" . }}
+      - name: "storage-volume"
+      {{- if .Values.Persistence.Enabled }}
+        persistentVolumeClaim:
+          claimName: {{ .Values.Persistence.ExistingClaim | default (include "fullname" .) }}
+      {{- else }}
+        emptyDir: {}
+      {{- end }}

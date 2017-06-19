@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    component: {{ template "fullname" . }}
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+  name: {{ template "fullname" . }}
+  namespace: {{ .Values.Namespace | default "default" }}
+data:
+  {{- if .Values.InstallPlugins }}
+  grafana-install-plugins: {{ .Values.InstallPlugins | quote }}
+  {{- end }}
+{{ toYaml .Values.Configuration | indent 2 }}
