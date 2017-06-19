@@ -1,0 +1,3 @@
+# don't commit dependent charts
+charts
+requirements.lock
